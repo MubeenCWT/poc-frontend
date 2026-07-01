@@ -6,3 +6,11 @@
   from = "/*"
   to = "/index.html"
   status = 200
+  
+[build.environment]
+  VITE_API_URL = "https://web-production-81ec2.up.railway.app"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

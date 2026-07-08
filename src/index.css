@@ -4,6 +4,8 @@
   --sand: #F5EDE0;
   --gold: #C9A876;
   --terracotta: #E8622C;
+  --wa: #25D366;
+  --wa-dark: #128C7E;
 
   --font-display: 'Archivo', sans-serif;
   --font-body: 'Inter', sans-serif;
@@ -35,6 +37,78 @@ input:focus-visible {
   outline: 2px solid var(--terracotta);
   outline-offset: 2px;
 }
+
+/* ---------- Entrance animations ---------- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.7s cubic-bezier(0.19, 1, 0.22, 1) both; }
+.fade-up-1 { animation-delay: 0.05s; }
+.fade-up-2 { animation-delay: 0.15s; }
+.fade-up-3 { animation-delay: 0.25s; }
+
+/* ---------- Property card hover ---------- */
+.card-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px rgba(11, 17, 32, 0.16);
+}
+.card-hover:hover .card-img { transform: scale(1.06); }
+.card-img { transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
+
+/* ---------- WhatsApp floating button ---------- */
+.wa-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 60px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--wa);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  box-shadow: 0 10px 26px rgba(37, 211, 102, 0.45);
+  overflow: hidden;
+  max-width: 60px;
+  transition: max-width 0.35s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 0.25s ease, transform 0.2s ease;
+}
+.wa-fab__icon { font-size: 28px; min-width: 24px; }
+.wa-fab__label { white-space: nowrap; opacity: 0; padding-left: 10px; transition: opacity 0.25s ease 0.05s; }
+.wa-fab:hover { max-width: 260px; transform: translateY(-2px); box-shadow: 0 14px 32px rgba(37, 211, 102, 0.55); }
+.wa-fab:hover .wa-fab__label { opacity: 1; }
+
+/* ---------- Buttons ---------- */
+.btn-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--wa);
+  color: #fff;
+  padding: 14px 24px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 8px 20px rgba(37, 211, 102, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.btn-wa:hover { transform: translateY(-2px); background: var(--wa-dark); box-shadow: 0 12px 26px rgba(18, 140, 126, 0.45); }
+
+.link-underline { position: relative; }
+.link-underline::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: -4px;
+  width: 0; height: 2px;
+  background: var(--gold);
+  transition: width 0.25s ease;
+}
+.link-underline:hover::after { width: 100%; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

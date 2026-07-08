@@ -2,12 +2,12 @@ export default function PropertyCard({ property }) {
   const { title, area, emirate, bedrooms, price_daily, price_monthly, images } = property
 
   return (
-    <div style={styles.card}>
+    <div style={styles.card} className="card-hover">
       <div style={styles.imageWrap}>
         {images?.[0] ? (
-          <img src={images[0]} alt={title} style={styles.image} />
+          <img src={images[0]} alt={title} style={styles.image} className="card-img" />
         ) : (
-          <div style={styles.imagePlaceholder} />
+          <div style={styles.imagePlaceholder} className="card-img" />
         )}
       </div>
       <div style={styles.body}>

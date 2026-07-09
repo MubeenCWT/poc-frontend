@@ -14,19 +14,30 @@ export default function AdminProperties() {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const [deleting, setDeleting] = useState(null);
+  const [restoring, setRestoring] = useState(null);
+  const [message, setMessage] = useState('');
 
   const token = localStorage.getItem('dar_admin_token');
 
   const fetchProperties = () => {
-    apiFetch('/api/properties/')
-      .then(r => r.json())
-      .then(data => setProperties(data))
-      .catch(console.error);
+    if (!token) return;
+    apiFetch('/api/properties/admin/all', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => {
+        if (r.status === 401) {
+          setMessage('Session expired — please log in again.');
+          return [];
+        }
+        return r.json();
+      })
+      .then((data) => setProperties(Array.isArray(data) ? data : []))
+      .catch(() => setMessage('Could not load properties.'));
   };
 
   useEffect(() => {
     fetchProperties();
-  }, []);
+  }, [token]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,24 +82,51 @@ export default function AdminProperties() {
 
   const handleDelete = async (propertyId, title) => {
     if (!token) return;
-    if (!window.confirm(`Remove "${title}" from listings? Existing bookings are kept.`)) return;
+    if (!window.confirm(`Remove "${title}" from public listings?\n\nExisting bookings are kept.`)) return;
 
     setDeleting(propertyId);
+    setMessage('');
     try {
       const res = await apiFetch(`/api/properties/${propertyId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
+        setMessage(`"${title}" removed from listings.`);
         fetchProperties();
       } else {
         const error = await res.json();
-        alert('Error: ' + JSON.stringify(error));
+        setMessage('Delete failed: ' + (error.detail || JSON.stringify(error)));
       }
     } catch (err) {
       console.error(err);
+      setMessage('Delete failed. Please try again.');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleRestore = async (propertyId, title) => {
+    if (!token) return;
+    setRestoring(propertyId);
+    setMessage('');
+    try {
+      const res = await apiFetch(`/api/properties/${propertyId}/restore`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setMessage(`"${title}" is live on the site again.`);
+        fetchProperties();
+      } else {
+        const error = await res.json();
+        setMessage('Restore failed: ' + (error.detail || JSON.stringify(error)));
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage('Restore failed. Please try again.');
+    } finally {
+      setRestoring(null);
     }
   };
 
@@ -108,6 +146,10 @@ export default function AdminProperties() {
           + Add Property
         </button>
       </div>
+
+      {message && (
+        <p style={{ marginBottom: '16px', fontSize: '14px', color: '#2D3B4E' }}>{message}</p>
+      )}
       
       <div className="table-scroll" style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -117,30 +159,51 @@ export default function AdminProperties() {
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Type</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Area</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Daily AED</th>
+              <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Status</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {properties.map(p => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+              <tr key={p.id} style={{ borderBottom: '1px solid #eee', opacity: p.status === 'inactive' ? 0.65 : 1 }}>
                 <td style={{ padding: '16px', fontSize: '14px', fontWeight: 500 }}>{p.title}</td>
                 <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>{p.property_type}</td>
                 <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>{p.area}, {p.emirate}</td>
                 <td style={{ padding: '16px', fontSize: '14px' }}>{p.price_daily}</td>
                 <td style={{ padding: '16px', fontSize: '13px' }}>
-                  <button
-                    type="button"
-                    disabled={deleting === p.id}
-                    onClick={() => handleDelete(p.id, p.title)}
-                    style={deleteBtnStyle}
-                  >
-                    {deleting === p.id ? 'Removing…' : 'Delete'}
-                  </button>
+                  <span style={{
+                    padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600,
+                    background: p.status === 'active' ? '#e6f4ea' : '#fce8e6',
+                    color: p.status === 'active' ? '#137333' : '#c5221f',
+                  }}>
+                    {p.status === 'active' ? 'Live' : 'Removed'}
+                  </span>
+                </td>
+                <td style={{ padding: '16px', fontSize: '13px' }}>
+                  {p.status === 'active' ? (
+                    <button
+                      type="button"
+                      disabled={deleting === p.id}
+                      onClick={() => handleDelete(p.id, p.title)}
+                      style={deleteBtnStyle}
+                    >
+                      {deleting === p.id ? 'Removing…' : 'Delete'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={restoring === p.id}
+                      onClick={() => handleRestore(p.id, p.title)}
+                      style={restoreBtnStyle}
+                    >
+                      {restoring === p.id ? 'Restoring…' : 'Restore'}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
             {properties.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No properties found.</td></tr>
+              <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No properties found.</td></tr>
             )}
           </tbody>
         </table>
@@ -251,6 +314,17 @@ const deleteBtnStyle = {
   background: '#fff',
   color: '#c5221f',
   border: '1px solid #f5c6c6',
+  borderRadius: '4px',
+  padding: '6px 12px',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const restoreBtnStyle = {
+  background: '#fff',
+  color: '#137333',
+  border: '1px solid #ceead6',
   borderRadius: '4px',
   padding: '6px 12px',
   fontSize: '12px',

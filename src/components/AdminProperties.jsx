@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api.js';
 
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80';
+
+const emptyForm = {
+  title: '', property_type: 'Apartment', emirate: 'Dubai', area: '',
+  price_daily: '', price_monthly: '', price_yearly: '',
+  bedrooms: '', bathrooms: '', max_guests: '', image_url: '',
+};
+
 export default function AdminProperties() {
   const [properties, setProperties] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '', property_type: 'Apartment', emirate: 'Dubai', area: '',
-    price_daily: '', price_monthly: '', price_yearly: '',
-    bedrooms: '', bathrooms: '', max_guests: '', images: []
-  });
+  const [formData, setFormData] = useState(emptyForm);
+  const [deleting, setDeleting] = useState(null);
+
+  const token = localStorage.getItem('dar_admin_token');
 
   const fetchProperties = () => {
     apiFetch('/api/properties/')
@@ -23,36 +30,35 @@ export default function AdminProperties() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('dar_admin_token');
-    
-    // Parse numeric fields properly
+    if (!token) return;
+
+    const imageUrl = formData.image_url.trim() || DEFAULT_IMAGE;
     const payload = {
-      ...formData,
+      title: formData.title,
+      property_type: formData.property_type,
+      emirate: formData.emirate,
+      area: formData.area,
       price_daily: formData.price_daily ? Number(formData.price_daily) : null,
       price_monthly: formData.price_monthly ? Number(formData.price_monthly) : null,
       price_yearly: formData.price_yearly ? Number(formData.price_yearly) : null,
       bedrooms: formData.bedrooms ? Number(formData.bedrooms) : null,
       bathrooms: formData.bathrooms ? Number(formData.bathrooms) : null,
       max_guests: formData.max_guests ? Number(formData.max_guests) : null,
-      images: ['https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80'] // Default image for newly created ones
+      images: [imageUrl],
     };
 
     try {
       const res = await apiFetch('/api/properties/', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setShowModal(false);
-        setFormData({
-          title: '', property_type: 'Apartment', emirate: 'Dubai', area: '',
-          price_daily: '', price_monthly: '', price_yearly: '',
-          bedrooms: '', bathrooms: '', max_guests: '', images: []
-        });
+        setFormData(emptyForm);
         fetchProperties();
       } else {
         const error = await res.json();
@@ -63,7 +69,30 @@ export default function AdminProperties() {
     }
   };
 
-  const handleChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
+  const handleDelete = async (propertyId, title) => {
+    if (!token) return;
+    if (!window.confirm(`Remove "${title}" from listings? Existing bookings are kept.`)) return;
+
+    setDeleting(propertyId);
+    try {
+      const res = await apiFetch(`/api/properties/${propertyId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        fetchProperties();
+      } else {
+        const error = await res.json();
+        alert('Error: ' + JSON.stringify(error));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   return (
     <div>
@@ -80,7 +109,7 @@ export default function AdminProperties() {
         </button>
       </div>
       
-      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
+      <div className="table-scroll" style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #eee' }}>
@@ -88,6 +117,7 @@ export default function AdminProperties() {
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Type</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Area</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Daily AED</th>
+              <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -97,10 +127,20 @@ export default function AdminProperties() {
                 <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>{p.property_type}</td>
                 <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>{p.area}, {p.emirate}</td>
                 <td style={{ padding: '16px', fontSize: '14px' }}>{p.price_daily}</td>
+                <td style={{ padding: '16px', fontSize: '13px' }}>
+                  <button
+                    type="button"
+                    disabled={deleting === p.id}
+                    onClick={() => handleDelete(p.id, p.title)}
+                    style={deleteBtnStyle}
+                  >
+                    {deleting === p.id ? 'Removing…' : 'Delete'}
+                  </button>
+                </td>
               </tr>
             ))}
             {properties.length === 0 && (
-              <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No properties found.</td></tr>
+              <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No properties found.</td></tr>
             )}
           </tbody>
         </table>
@@ -142,6 +182,18 @@ export default function AdminProperties() {
               <div>
                 <label style={labelStyle}>Area</label>
                 <input name="area" value={formData.area} onChange={handleChange} style={inputStyle} placeholder="e.g. Dubai Marina" />
+              </div>
+              <div>
+                <label style={labelStyle}>Image URL</label>
+                <input
+                  name="image_url"
+                  type="url"
+                  value={formData.image_url}
+                  onChange={handleChange}
+                  style={inputStyle}
+                  placeholder="https://… (leave blank for default photo)"
+                />
+                <p style={hintStyle}>Paste a direct link to a photo. If left empty, a default placeholder image is used.</p>
               </div>
               <div style={{ display: 'flex', gap: '16px' }}>
                 <div style={{ flex: 1 }}>
@@ -189,4 +241,19 @@ const inputStyle = {
 
 const labelStyle = {
   display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600
+};
+
+const hintStyle = {
+  marginTop: '6px', fontSize: '12px', color: '#888', lineHeight: 1.4,
+};
+
+const deleteBtnStyle = {
+  background: '#fff',
+  color: '#c5221f',
+  border: '1px solid #f5c6c6',
+  borderRadius: '4px',
+  padding: '6px 12px',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
 };

@@ -2,7 +2,7 @@ import { FaWhatsapp } from 'react-icons/fa';
 
 const RAW_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '';
 const DIGITS = RAW_NUMBER.replace(/[^0-9]/g, '');
-const PREFILL = 'Hi DAR! I would like to ask about a property.';
+const PREFILL = 'Hi! I would like to ask about a property.';
 
 export const WHATSAPP_ENABLED = DIGITS.length > 0;
 

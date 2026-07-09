@@ -7,9 +7,11 @@ export default function AdminVendors() {
   const [formData, setFormData] = useState({
     name: '', service_type: '', phone: '', email: ''
   });
+  const [deleting, setDeleting] = useState(null);
+
+  const token = localStorage.getItem('dar_admin_token');
 
   const fetchVendors = () => {
-    const token = localStorage.getItem('dar_admin_token');
     if (!token) return;
 
     apiFetch('/api/vendors/', {
@@ -26,7 +28,7 @@ export default function AdminVendors() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('dar_admin_token');
+    if (!token) return;
     try {
       const res = await apiFetch('/api/vendors/', {
         method: 'POST',
@@ -49,6 +51,29 @@ export default function AdminVendors() {
     }
   };
 
+  const handleDelete = async (vendorId, name) => {
+    if (!token) return;
+    if (!window.confirm(`Remove vendor "${name}"?`)) return;
+
+    setDeleting(vendorId);
+    try {
+      const res = await apiFetch(`/api/vendors/${vendorId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        fetchVendors();
+      } else {
+        const error = await res.json();
+        alert('Error: ' + JSON.stringify(error));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -64,13 +89,14 @@ export default function AdminVendors() {
         </button>
       </div>
       
-      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
+      <div className="table-scroll" style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #eee' }}>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Name</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Service Type</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Phone</th>
+              <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -79,10 +105,20 @@ export default function AdminVendors() {
                 <td style={{ padding: '16px', fontSize: '14px', fontWeight: 500 }}>{v.name}</td>
                 <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>{v.service_type}</td>
                 <td style={{ padding: '16px', fontSize: '14px' }}>{v.phone}</td>
+                <td style={{ padding: '16px', fontSize: '13px' }}>
+                  <button
+                    type="button"
+                    disabled={deleting === v.id}
+                    onClick={() => handleDelete(v.id, v.name)}
+                    style={deleteBtnStyle}
+                  >
+                    {deleting === v.id ? 'Removing…' : 'Delete'}
+                  </button>
+                </td>
               </tr>
             ))}
             {vendors.length === 0 && (
-              <tr><td colSpan={3} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No vendors found.</td></tr>
+              <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No vendors found.</td></tr>
             )}
           </tbody>
         </table>
@@ -133,4 +169,15 @@ export default function AdminVendors() {
 
 const inputStyle = {
   width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box', fontFamily: 'var(--font-body)'
+};
+
+const deleteBtnStyle = {
+  background: '#fff',
+  color: '#c5221f',
+  border: '1px solid #f5c6c6',
+  borderRadius: '4px',
+  padding: '6px 12px',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
 };

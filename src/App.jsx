@@ -77,18 +77,28 @@ function LandingPage() {
 }
 
 function Nav() {
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
-    <nav style={styles.nav}>
-      <span style={styles.logo}>DAR</span>
-      <div style={styles.navLinks}>
-        <a href="#listings" className="link-underline">Stays</a>
-        <a href="#how" className="link-underline">How it works</a>
+    <nav style={styles.nav} className="site-nav">
+      <span style={styles.logo} className="site-logo">UAE Stays</span>
+      <button
+        type="button"
+        className="nav-toggle"
+        aria-label="Toggle menu"
+        onClick={() => setMenuOpen((o) => !o)}
+      >
+        {menuOpen ? '✕' : '☰'}
+      </button>
+      <div className={`nav-links${menuOpen ? ' nav-links--open' : ''}`} style={styles.navLinks}>
+        <a href="#listings" className="link-underline" onClick={() => setMenuOpen(false)}>Stays</a>
+        <a href="#how" className="link-underline" onClick={() => setMenuOpen(false)}>How it works</a>
         {WHATSAPP_ENABLED && (
-          <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" className="link-underline">
+          <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" className="link-underline" onClick={() => setMenuOpen(false)}>
             Chat on WhatsApp
           </a>
         )}
-        <a href="/admin/login" style={styles.navCta}>Admin</a>
+        <a href="/admin/login" style={styles.navCta} onClick={() => setMenuOpen(false)}>Admin</a>
       </div>
     </nav>
   )
@@ -96,14 +106,14 @@ function Nav() {
 
 function Hero({ query, setQuery, onSearch }) {
   return (
-    <header style={styles.hero}>
+    <header style={styles.hero} className="hero">
       <Skyline style={styles.heroSkyline} />
       <div style={styles.heroOverlay} />
-      <div style={styles.heroContent}>
+      <div style={styles.heroContent} className="hero-content">
         <p style={styles.heroEyebrow} className="fade-up fade-up-1">
           Daily · Monthly · Yearly stays across the UAE
         </p>
-        <h1 style={styles.heroTitle} className="fade-up fade-up-2">
+        <h1 style={styles.heroTitle} className="fade-up fade-up-2 hero-title">
           Your Dubai address,<br />booked over a chat.
         </h1>
         <p style={styles.heroSub} className="fade-up fade-up-2">
@@ -111,7 +121,7 @@ function Hero({ query, setQuery, onSearch }) {
           message us on WhatsApp to lock it in. No forms, no back-and-forth.
         </p>
 
-        <div style={styles.searchBar} className="fade-up fade-up-3">
+        <div style={styles.searchBar} className="fade-up fade-up-3 search-bar">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -125,7 +135,7 @@ function Hero({ query, setQuery, onSearch }) {
         {WHATSAPP_ENABLED && (
           <div style={styles.heroCtaRow} className="fade-up fade-up-3">
             <a
-              href={whatsappLink('Hi DAR! I want to book a stay.')}
+              href={whatsappLink('Hi! I want to book a stay.')}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-wa"
@@ -161,10 +171,10 @@ function StatsStrip() {
 
 function Listings({ properties, total, loading, query }) {
   return (
-    <section id="listings" style={styles.listings}>
+    <section id="listings" style={styles.listings} className="section-pad">
       <div style={styles.sectionHead}>
         <p style={styles.sectionEyebrow}>Available now</p>
-        <h2 style={styles.sectionTitle}>
+        <h2 style={styles.sectionTitle} className="section-title">
           {query ? `Results for "${query}"` : 'Featured stays'}
         </h2>
         {!loading && (
@@ -199,10 +209,10 @@ function HowItWorks() {
   const steps = [
     { n: '01', label: 'Browse', text: 'Explore stays across the UAE and find one that fits your dates and budget.' },
     { n: '02', label: 'Message', text: 'Tap “Chat on WhatsApp” — our assistant handles dates, availability, and your quote.' },
-    { n: '03', label: 'Confirm', text: 'We hold your dates instantly and confirm your booking right in the chat.' },
+    { n: '03', label: 'Confirm', text: 'Once payment is received, we confirm your booking right in the chat.' },
   ]
   return (
-    <section id="how" style={styles.how}>
+    <section id="how" style={styles.how} className="section-pad how-section">
       <div style={styles.sectionHead}>
         <p style={{ ...styles.sectionEyebrow, color: 'var(--gold)' }}>The process</p>
         <h2 style={{ ...styles.sectionTitle, color: 'var(--sand)' }}>Booked over chat, not forms</h2>
@@ -223,8 +233,8 @@ function HowItWorks() {
 function WhatsAppCTA() {
   if (!WHATSAPP_ENABLED) return null
   return (
-    <section style={styles.waCta}>
-      <div style={styles.waCtaInner}>
+    <section style={styles.waCta} className="section-pad wa-cta-section">
+      <div style={styles.waCtaInner} className="wa-cta-inner">
         <div>
           <h2 style={styles.waCtaTitle}>Ready when you are.</h2>
           <p style={styles.waCtaSub}>
@@ -232,7 +242,7 @@ function WhatsAppCTA() {
           </p>
         </div>
         <a
-          href={whatsappLink('Hi DAR! I would like to get started.')}
+          href={whatsappLink('Hi! I would like to get started.')}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-wa"
@@ -247,11 +257,11 @@ function WhatsAppCTA() {
 
 function Footer() {
   return (
-    <footer style={styles.footer}>
-      <span style={styles.footerLogo}>DAR — UAE Stays</span>
+    <footer style={styles.footer} className="site-footer">
+      <span style={styles.footerLogo}>UAE Stays</span>
       {WHATSAPP_ENABLED ? (
         <a
-          href={whatsappLink('Hi DAR! I have a question.')}
+          href={whatsappLink('Hi! I have a question.')}
           target="_blank"
           rel="noopener noreferrer"
           className="link-underline"
@@ -271,7 +281,7 @@ const styles = {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '22px 48px', position: 'absolute', top: 0, left: 0, right: 0, zIndex: 3,
   },
-  logo: { fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, letterSpacing: '0.1em', color: '#F5EDE0' },
+  logo: { fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20, letterSpacing: '0.04em', color: '#F5EDE0' },
   navLinks: { display: 'flex', gap: 30, alignItems: 'center', fontSize: 14, color: '#F5EDE0' },
   navCta: {
     background: '#E8622C', color: '#F5EDE0', padding: '9px 18px', borderRadius: 4,

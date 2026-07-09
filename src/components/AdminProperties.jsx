@@ -21,13 +21,22 @@ export default function AdminProperties() {
 
   const fetchProperties = () => {
     if (!token) return;
-    apiFetch('/api/properties/admin/all', {
+    apiFetch('/api/properties/?include_inactive=true', {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => {
+      .then(async (r) => {
         if (r.status === 401) {
           setMessage('Session expired — please log in again.');
           return [];
+        }
+        if (r.status === 404) {
+          // Fallback for backends not yet redeployed with include_inactive support
+          const legacy = await apiFetch('/api/properties/admin/all', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (legacy.ok) return legacy.json();
+          const pub = await apiFetch('/api/properties/');
+          return pub.ok ? pub.json() : [];
         }
         return r.json();
       })

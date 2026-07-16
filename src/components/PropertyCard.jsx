@@ -1,5 +1,10 @@
+import { FaWhatsapp } from 'react-icons/fa'
+import { whatsappLink, WHATSAPP_ENABLED } from './WhatsAppButton.jsx'
+
 export default function PropertyCard({ property }) {
   const { title, area, emirate, bedrooms, price_daily, price_monthly, images } = property
+
+  const inquireText = `Hi! I want to inquire about ${title}${area ? ` in ${area}` : ''}. Please share the details.`
 
   return (
     <div style={styles.card} className="card-hover">
@@ -21,6 +26,16 @@ export default function PropertyCard({ property }) {
             <span style={styles.priceAlt}>AED {price_monthly.toLocaleString()} / mo</span>
           )}
         </div>
+        {WHATSAPP_ENABLED && (
+          <a
+            href={whatsappLink(inquireText)}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={styles.inquireBtn}
+          >
+            <FaWhatsapp size={16} /> Inquire
+          </a>
+        )}
       </div>
     </div>
   )
@@ -48,8 +63,20 @@ const styles = {
   },
   title: { fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, marginBottom: 6, lineHeight: 1.2 },
   meta: { fontSize: 13, color: '#2D3B4E', opacity: 0.75, marginBottom: 14 },
-  priceRow: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' },
+  priceRow: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap', marginBottom: 16 },
   price: { fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 500 },
   priceUnit: { fontSize: 12, opacity: 0.6 },
   priceAlt: { fontFamily: 'var(--font-mono)', fontSize: 12, opacity: 0.5, marginLeft: 'auto' },
+  inquireBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    background: '#25D366',
+    color: '#fff',
+    padding: '10px 16px',
+    borderRadius: 6,
+    fontWeight: 600,
+    fontSize: 14,
+    textDecoration: 'none',
+  },
 }

@@ -5,6 +5,8 @@ export default function AdminBookings() {
   const [bookings, setBookings] = useState([]);
   const [properties, setProperties] = useState({});
   const [acting, setActing] = useState(null);
+  const [counterFor, setCounterFor] = useState(null);
+  const [counterAmount, setCounterAmount] = useState('');
 
   const token = localStorage.getItem('dar_admin_token');
 
@@ -34,23 +36,37 @@ export default function AdminBookings() {
     loadBookings();
   }, [token]);
 
-  const decideDiscount = async (bookingId, approve) => {
+  const decideDiscount = async (bookingId, approve, counter = null) => {
     setActing(bookingId);
     try {
+      const body = counter != null
+        ? { approve: false, counter_amount: Number(counter) }
+        : { approve };
       await apiFetch(`/api/bookings/${bookingId}/discount-decision`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ approve }),
+        body: JSON.stringify(body),
       });
+      setCounterFor(null);
+      setCounterAmount('');
       loadBookings();
     } catch (err) {
       console.error(err);
     } finally {
       setActing(null);
     }
+  };
+
+  const submitCounter = (bookingId) => {
+    const amount = Number(counterAmount);
+    if (!amount || amount <= 0) {
+      alert('Enter a valid discount amount in AED');
+      return;
+    }
+    decideDiscount(bookingId, false, amount);
   };
 
   const confirmBooking = async (bookingId) => {
@@ -101,41 +117,77 @@ export default function AdminBookings() {
                 <td style={{ padding: '16px', fontSize: '14px' }}>
                   <span style={{
                     padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600,
-                    background: b.status === 'confirmed' ? '#e6f4ea' : '#fef7e0',
-                    color: b.status === 'confirmed' ? '#137333' : '#b06000',
+                    background: b.status === 'confirmed' ? '#e6f4ea' : b.status === 'cancelled' ? '#fce8e6' : '#fef7e0',
+                    color: b.status === 'confirmed' ? '#137333' : b.status === 'cancelled' ? '#c5221f' : '#b06000',
                   }}>
                     {b.status}
                   </span>
                 </td>
                 <td style={{ padding: '16px', fontSize: '13px' }}>
                   {b.discount_status === 'pending' && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        disabled={acting === b.id}
-                        onClick={() => decideDiscount(b.id, true)}
-                        style={btnStyle('#137333')}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        disabled={acting === b.id}
-                        onClick={() => decideDiscount(b.id, false)}
-                        style={btnStyle('#c5221f')}
-                      >
-                        Reject
-                      </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          disabled={acting === b.id}
+                          onClick={() => decideDiscount(b.id, true)}
+                          style={btnStyle('#137333')}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          disabled={acting === b.id}
+                          onClick={() => setCounterFor(counterFor === b.id ? null : b.id)}
+                          style={btnStyle('#b06000')}
+                        >
+                          Counter
+                        </button>
+                        <button
+                          type="button"
+                          disabled={acting === b.id}
+                          onClick={() => decideDiscount(b.id, false)}
+                          style={btnStyle('#c5221f')}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                      {counterFor === b.id && (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Offer AED off"
+                            value={counterAmount}
+                            onChange={(e) => setCounterAmount(e.target.value)}
+                            style={{
+                              padding: '6px 10px', border: '1px solid #ccc', borderRadius: '4px',
+                              width: '120px', fontSize: '13px',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            disabled={acting === b.id}
+                            onClick={() => submitCounter(b.id)}
+                            style={btnStyle('#0B1120')}
+                          >
+                            Send offer
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                  {b.status === 'pending' && b.discount_status !== 'pending' && (
+                  {b.discount_status === 'countered' && (
+                    <span style={{ fontSize: '12px', color: '#b06000' }}>Waiting on tenant…</span>
+                  )}
+                  {b.status === 'pending' && b.discount_status !== 'pending' && b.discount_status !== 'countered' && (
                     <button
                       type="button"
                       disabled={acting === b.id}
                       onClick={() => confirmBooking(b.id)}
                       style={btnStyle('#0B1120')}
                     >
-                      Confirm
+                      Confirm payment
                     </button>
                   )}
                 </td>

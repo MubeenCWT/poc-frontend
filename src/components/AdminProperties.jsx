@@ -11,6 +11,8 @@ const emptyForm = {
 
 export default function AdminProperties() {
   const [properties, setProperties] = useState([]);
+  const [owners, setOwners] = useState([]);
+  const [assigning, setAssigning] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const [deleting, setDeleting] = useState(null);
@@ -46,6 +48,11 @@ export default function AdminProperties() {
 
   useEffect(() => {
     fetchProperties();
+    if (!token) return;
+    apiFetch('/api/owners/', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setOwners(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, [token]);
 
   const handleSubmit = async (e) => {
@@ -141,6 +148,29 @@ export default function AdminProperties() {
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
+  const handleAssignOwner = async (propertyId, ownerId) => {
+    if (!token) return;
+    setAssigning(propertyId);
+    try {
+      const res = await apiFetch(`/api/owners/properties/${propertyId}/assign`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ owner_id: ownerId || null }),
+      });
+      if (res.ok) {
+        setMessage('Owner assignment updated.');
+        fetchProperties();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAssigning(null);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -168,6 +198,7 @@ export default function AdminProperties() {
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Type</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Area</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Daily AED</th>
+              <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Owner</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Status</th>
               <th style={{ padding: '16px', fontSize: '13px', color: '#555' }}>Actions</th>
             </tr>
@@ -179,6 +210,19 @@ export default function AdminProperties() {
                 <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>{p.property_type}</td>
                 <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>{p.area}, {p.emirate}</td>
                 <td style={{ padding: '16px', fontSize: '14px' }}>{p.price_daily}</td>
+                <td style={{ padding: '16px', fontSize: '13px' }}>
+                  <select
+                    value={p.owner_id || ''}
+                    disabled={assigning === p.id}
+                    onChange={(e) => handleAssignOwner(p.id, e.target.value)}
+                    style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', maxWidth: '160px' }}
+                  >
+                    <option value="">— Admin —</option>
+                    {owners.map((o) => (
+                      <option key={o.id} value={o.id}>{o.full_name}</option>
+                    ))}
+                  </select>
+                </td>
                 <td style={{ padding: '16px', fontSize: '13px' }}>
                   <span style={{
                     padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600,
@@ -212,7 +256,7 @@ export default function AdminProperties() {
               </tr>
             ))}
             {properties.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No properties found.</td></tr>
+              <tr><td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No properties found.</td></tr>
             )}
           </tbody>
         </table>

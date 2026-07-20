@@ -11,6 +11,7 @@ import AdminLogin from './components/AdminLogin.jsx'
 import AdminLayout from './components/AdminLayout.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import AdminProperties from './components/AdminProperties.jsx'
+import AdminOwners from './components/AdminOwners.jsx'
 import AdminVendors from './components/AdminVendors.jsx'
 import AdminBookings from './components/AdminBookings.jsx'
 import AdminMaintenance from './components/AdminMaintenance.jsx'
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="properties" element={<AdminProperties />} />
+          <Route path="owners" element={<AdminOwners />} />
           <Route path="vendors" element={<AdminVendors />} />
           <Route path="bookings" element={<AdminBookings />} />
           <Route path="maintenance" element={<AdminMaintenance />} />

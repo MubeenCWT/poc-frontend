@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiHome, FiTool, FiCalendar, FiBox, FiLogOut, FiBell, FiMenu } from 'react-icons/fi';
+import { FiHome, FiTool, FiCalendar, FiBox, FiLogOut, FiBell, FiMenu, FiUsers } from 'react-icons/fi';
 import { apiFetch } from '../lib/api.js';
 
 export default function AdminLayout() {
@@ -62,6 +62,7 @@ export default function AdminLayout() {
   const navItems = [
     { path: '/admin', label: 'Dashboard', icon: <FiHome /> },
     { path: '/admin/properties', label: 'Properties', icon: <FiBox /> },
+    { path: '/admin/owners', label: 'Owners', icon: <FiUsers /> },
     { path: '/admin/bookings', label: 'Bookings', icon: <FiCalendar /> },
     { path: '/admin/maintenance', label: 'Maintenance', icon: <FiTool /> },
     { path: '/admin/vendors', label: 'Vendors', icon: <FiTool /> },

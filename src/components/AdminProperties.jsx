@@ -9,6 +9,30 @@ const emptyForm = {
   bedrooms: '', bathrooms: '', max_guests: '', image_url: '',
 };
 
+function fmtDate(iso) {
+  if (!iso) return ''
+  try {
+    return new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })
+  } catch {
+    return iso
+  }
+}
+
+function statusBadge(p) {
+  if (p.status === 'inactive') {
+    return { label: 'Removed', bg: '#fce8e6', color: '#c5221f' }
+  }
+  if (p.listing_label === 'blocked' || p.block_active) {
+    return { label: 'Blocked', bg: '#fce8e6', color: '#c5221f' }
+  }
+  if (p.listing_label === 'blocked_soon') {
+    return { label: 'Blocked soon', bg: '#fef7e0', color: '#b06000' }
+  }
+  return { label: 'Live', bg: '#e6f4ea', color: '#137333' }
+}
+
 export default function AdminProperties() {
   const [properties, setProperties] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -173,7 +197,9 @@ export default function AdminProperties() {
             </tr>
           </thead>
           <tbody>
-            {properties.map(p => (
+            {properties.map(p => {
+              const badge = statusBadge(p)
+              return (
               <tr key={p.id} style={{ borderBottom: '1px solid #eee', opacity: p.status === 'inactive' ? 0.65 : 1 }}>
                 <td style={{ padding: '16px', fontSize: '14px', fontWeight: 500 }}>{p.title}</td>
                 <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>{p.property_type}</td>
@@ -182,11 +208,16 @@ export default function AdminProperties() {
                 <td style={{ padding: '16px', fontSize: '13px' }}>
                   <span style={{
                     padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600,
-                    background: p.status === 'active' ? '#e6f4ea' : '#fce8e6',
-                    color: p.status === 'active' ? '#137333' : '#c5221f',
+                    background: badge.bg,
+                    color: badge.color,
                   }}>
-                    {p.status === 'active' ? 'Live' : 'Removed'}
+                    {badge.label}
                   </span>
+                  {(p.block_start && p.block_end) && (
+                    <div style={{ fontSize: '11px', color: '#888', marginTop: '6px' }}>
+                      {fmtDate(p.block_start)} – {fmtDate(p.block_end)}
+                    </div>
+                  )}
                 </td>
                 <td style={{ padding: '16px', fontSize: '13px' }}>
                   {p.status === 'active' ? (
@@ -210,7 +241,7 @@ export default function AdminProperties() {
                   )}
                 </td>
               </tr>
-            ))}
+            )})}
             {properties.length === 0 && (
               <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#888' }}>No properties found.</td></tr>
             )}

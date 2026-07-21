@@ -79,6 +79,35 @@ function statusBadge(p) {
   return { label: 'Live', bg: '#e6f4ea', color: '#137333' }
 }
 
+function availabilityLabel(property) {
+  const status = property.availability_status
+  if (status === 'available') return 'Available now'
+  if (status === 'booked') return 'Currently booked'
+  if (status === 'blocked') return 'Temporarily blocked'
+  if (status === 'offline' || property.status === 'offline') return 'Offline'
+  if (property.status === 'inactive') return 'Removed'
+
+  // Backward-compatible fallback for deployments that do not yet return
+  // availability_status. An active public listing must not appear offline.
+  if (property.block_active || property.listing_label === 'blocked') {
+    return 'Temporarily blocked'
+  }
+  return property.status === 'active' ? 'Available now' : 'Not available'
+}
+
+function nextAvailableLabel(property) {
+  if (property.next_available_date) return fmtDate(property.next_available_date)
+  if (property.status === 'offline' || property.status === 'inactive') return 'Not listed'
+  if (property.block_end) {
+    const release = new Date(property.block_end + 'T12:00:00')
+    release.setDate(release.getDate() + 1)
+    return release.toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })
+  }
+  return property.status === 'active' ? 'Available now' : '—'
+}
+
 export default function AdminProperties() {
   const [properties, setProperties] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -644,19 +673,11 @@ export default function AdminProperties() {
                   <Detail label="Amenities" value={selectedProperty.amenities?.join(', ')} wide />
                   <Detail
                     label="Availability"
-                    value={
-                      selectedProperty.availability_status === 'available'
-                        ? 'Available now'
-                        : selectedProperty.availability_status === 'booked'
-                          ? 'Currently booked'
-                          : selectedProperty.availability_status === 'blocked'
-                            ? 'Temporarily blocked'
-                            : 'Offline'
-                    }
+                    value={availabilityLabel(selectedProperty)}
                   />
                   <Detail
                     label="Next available"
-                    value={selectedProperty.next_available_date ? fmtDate(selectedProperty.next_available_date) : 'Not listed'}
+                    value={nextAvailableLabel(selectedProperty)}
                   />
                   <Detail label="Property ID" value={selectedProperty.id} wide />
                   <Detail label="Created" value={selectedProperty.created_at ? new Date(selectedProperty.created_at).toLocaleString() : null} wide />

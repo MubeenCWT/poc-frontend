@@ -116,7 +116,9 @@ export default function AdminProperties() {
   const [editForm, setEditForm] = useState(emptyForm);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [blockProperty, setBlockProperty] = useState(null);
   const [blockForm, setBlockForm] = useState({ start_date: '', end_date: '' });
+  const [blockMessage, setBlockMessage] = useState('');
   const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [restoring, setRestoring] = useState(null);
@@ -241,6 +243,18 @@ export default function AdminProperties() {
     setEditing(false);
   };
 
+  const openBlockModal = (property) => {
+    setBlockProperty(property);
+    setBlockForm({ start_date: '', end_date: '' });
+    setBlockMessage('');
+  };
+
+  const closeBlockModal = () => {
+    if (managing) return;
+    setBlockProperty(null);
+    setBlockMessage('');
+  };
+
   const closeDetails = () => {
     if (saving) return;
     setSelectedProperty(null);
@@ -300,15 +314,20 @@ export default function AdminProperties() {
 
   const handleBlock = async (e) => {
     e.preventDefault();
-    if (!selectedProperty) return;
+    const property = blockProperty || selectedProperty;
+    if (!property) return;
     if (!blockForm.start_date || !blockForm.end_date) {
-      setMessage('Select both the start date and end date, then click Apply date block.');
+      setBlockMessage('Select both the start date and end date.');
+      return;
+    }
+    if (blockForm.end_date < blockForm.start_date) {
+      setBlockMessage('The end date must be on or after the start date.');
       return;
     }
     setManaging(true);
-    setMessage('');
+    setBlockMessage('');
     try {
-      const res = await apiFetch(`/api/properties/${selectedProperty.id}/block`, {
+      const res = await apiFetch(`/api/properties/${property.id}/block`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -316,10 +335,24 @@ export default function AdminProperties() {
         },
         body: JSON.stringify(blockForm),
       });
-      await applyPropertyResponse(res, `"${selectedProperty.title}" blocked for the selected dates.`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || JSON.stringify(error));
+      }
+      const updated = await res.json();
+      if (selectedProperty?.id === updated.id) {
+        setSelectedProperty(updated);
+      }
+      setProperties((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setBlockProperty(updated);
+      setBlockMessage(
+        `Blocked successfully from ${fmtDate(updated.block_start || blockForm.start_date)} to ${fmtDate(updated.block_end || blockForm.end_date)}.`
+      );
+      setMessage(`"${property.title}" blocked for the selected dates.`);
+      fetchProperties();
       setBlockForm({ start_date: '', end_date: '' });
     } catch (err) {
-      setMessage(`Block failed: ${err.message}`);
+      setBlockMessage(`Could not block these dates: ${err.message}`);
     } finally {
       setManaging(false);
     }
@@ -452,6 +485,15 @@ export default function AdminProperties() {
                   >
                     View details
                   </button>
+                  {p.status === 'active' && (
+                    <button
+                      type="button"
+                      onClick={() => openBlockModal(p)}
+                      style={blockActionBtnStyle}
+                    >
+                      Block dates
+                    </button>
+                  )}
                   {p.status === 'active' ? (
                     <button
                       type="button"
@@ -459,7 +501,7 @@ export default function AdminProperties() {
                       onClick={() => handleDelete(p.id, p.title)}
                       style={deleteBtnStyle}
                     >
-                      {deleting === p.id ? 'Removing…' : 'Delete'}
+                      {deleting === p.id ? 'Removing…' : 'Remove from website'}
                     </button>
                   ) : (
                     <button
@@ -692,49 +734,27 @@ export default function AdminProperties() {
                     </p>
                   </div>
 
-                  <form onSubmit={handleBlock} style={blockFormStyle}>
-                    <div>
-                      <label style={labelStyle}>Block from</label>
-                      <input
-                        type="date"
-                        value={blockForm.start_date}
-                        onChange={(e) => setBlockForm({ ...blockForm, start_date: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Block until</label>
-                      <input
-                        type="date"
-                        min={blockForm.start_date || undefined}
-                        value={blockForm.end_date}
-                        onChange={(e) => setBlockForm({ ...blockForm, end_date: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <button type="submit" disabled={managing} style={blockBtnStyle}>
-                      {managing ? 'Applying…' : 'Apply date block'}
-                    </button>
-                  </form>
-
                   <div style={managementActionsStyle}>
+                    {selectedProperty.status === 'active' && (
+                      <button type="button" disabled={managing} onClick={() => openBlockModal(selectedProperty)} style={blockBtnStyle}>
+                        Block specific dates
+                      </button>
+                    )}
                     {(selectedProperty.block_start || selectedProperty.block_active) && (
                       <button type="button" disabled={managing} onClick={handleClearBlock} style={clearBlockBtnStyle}>
                         Clear block
                       </button>
                     )}
-                    {selectedProperty.status === 'active' ? (
-                      <button type="button" disabled={managing} onClick={() => handleListingStatus('offline')} style={offlineBtnStyle}>
-                        Take offline
-                      </button>
-                    ) : (
+                    {selectedProperty.status !== 'active' && (
                       <button type="button" disabled={managing} onClick={() => handleListingStatus('online')} style={onlineBtnStyle}>
-                        Bring online
+                        Restore to website
                       </button>
                     )}
-                    <button type="button" disabled={managing} onClick={handleRemoveFromDetails} style={removeBtnStyle}>
-                      Remove listing
-                    </button>
+                    {selectedProperty.status === 'active' && (
+                      <button type="button" disabled={managing} onClick={handleRemoveFromDetails} style={removeBtnStyle}>
+                        Remove from website
+                      </button>
+                    )}
                   </div>
                 </section>
 
@@ -744,6 +764,74 @@ export default function AdminProperties() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {blockProperty && (
+        <div
+          style={{ ...modalOverlayStyle, zIndex: 1200 }}
+          onMouseDown={(e) => e.target === e.currentTarget && closeBlockModal()}
+        >
+          <div style={{ ...detailsModalStyle, width: 520 }}>
+            <div style={modalHeaderStyle}>
+              <div>
+                <p style={{ ...hintStyle, margin: '0 0 4px' }}>BLOCK PROPERTY DATES</p>
+                <h2 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>{blockProperty.title}</h2>
+              </div>
+              <button type="button" onClick={closeBlockModal} style={closeBtnStyle}>×</button>
+            </div>
+
+            <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6 }}>
+              The property will remain visible on the website, but guests cannot book dates that overlap this period.
+            </p>
+
+            {blockMessage && (
+              <div style={{
+                ...modalMessageStyle,
+                background: blockMessage.startsWith('Blocked successfully') ? '#eaf6ed' : '#fff3f2',
+                color: blockMessage.startsWith('Blocked successfully') ? '#137333' : '#a12622',
+              }}>
+                {blockMessage}
+              </div>
+            )}
+
+            {blockProperty.block_start && blockProperty.block_end && (
+              <div style={currentBlockStyle}>
+                Current block: <strong>{fmtDate(blockProperty.block_start)} – {fmtDate(blockProperty.block_end)}</strong>
+              </div>
+            )}
+
+            <form onSubmit={handleBlock}>
+              <div style={formGridStyle}>
+                <div>
+                  <label style={labelStyle}>Block from *</label>
+                  <input
+                    type="date"
+                    value={blockForm.start_date}
+                    onChange={(e) => setBlockForm({ ...blockForm, start_date: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Block until *</label>
+                  <input
+                    type="date"
+                    min={blockForm.start_date || undefined}
+                    value={blockForm.end_date}
+                    onChange={(e) => setBlockForm({ ...blockForm, end_date: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <div style={modalActionsStyle}>
+                <button type="button" onClick={closeBlockModal} style={secondaryBtnStyle}>Close</button>
+                <button type="submit" disabled={managing} style={blockBtnStyle}>
+                  {managing ? 'Blocking…' : 'Confirm date block'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -801,6 +889,18 @@ const detailsBtnStyle = {
   background: '#fff',
   color: '#0B1120',
   border: '1px solid #ccd2da',
+  borderRadius: '4px',
+  padding: '6px 12px',
+  marginRight: '8px',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const blockActionBtnStyle = {
+  background: '#fff8e7',
+  color: '#9a5800',
+  border: '1px solid #e5bd75',
   borderRadius: '4px',
   padding: '6px 12px',
   marginRight: '8px',
@@ -938,6 +1038,16 @@ const managementPanelStyle = {
   border: '1px solid #e2e5e9',
   borderRadius: 8,
   background: '#fbfcfd',
+};
+
+const currentBlockStyle = {
+  background: '#fff8e7',
+  color: '#7a4700',
+  border: '1px solid #efd39d',
+  borderRadius: 6,
+  padding: '10px 12px',
+  marginBottom: 16,
+  fontSize: 13,
 };
 
 const blockFormStyle = {

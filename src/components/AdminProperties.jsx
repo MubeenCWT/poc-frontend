@@ -5,9 +5,52 @@ const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1512453979798-5ea266f88
 
 const emptyForm = {
   title: '', property_type: 'Apartment', emirate: 'Dubai', area: '',
+  description: '', address: '', amenities: '',
   price_daily: '', price_monthly: '', price_yearly: '',
   bedrooms: '', bathrooms: '', max_guests: '', image_url: '',
 };
+
+function propertyToForm(property) {
+  return {
+    title: property.title || '',
+    property_type: property.property_type || 'Apartment',
+    emirate: property.emirate || 'Dubai',
+    area: property.area || '',
+    description: property.description || '',
+    address: property.address || '',
+    amenities: Array.isArray(property.amenities) ? property.amenities.join(', ') : '',
+    price_daily: property.price_daily ?? '',
+    price_monthly: property.price_monthly ?? '',
+    price_yearly: property.price_yearly ?? '',
+    bedrooms: property.bedrooms ?? '',
+    bathrooms: property.bathrooms ?? '',
+    max_guests: property.max_guests ?? '',
+    image_url: property.images?.[0] || '',
+  }
+}
+
+function formToPayload(formData) {
+  const imageUrl = formData.image_url.trim() || DEFAULT_IMAGE
+  return {
+    title: formData.title.trim(),
+    description: formData.description.trim() || null,
+    property_type: formData.property_type,
+    emirate: formData.emirate,
+    area: formData.area.trim() || null,
+    address: formData.address.trim() || null,
+    price_daily: formData.price_daily !== '' ? Number(formData.price_daily) : null,
+    price_monthly: formData.price_monthly !== '' ? Number(formData.price_monthly) : null,
+    price_yearly: formData.price_yearly !== '' ? Number(formData.price_yearly) : null,
+    bedrooms: formData.bedrooms !== '' ? Number(formData.bedrooms) : null,
+    bathrooms: formData.bathrooms !== '' ? Number(formData.bathrooms) : null,
+    max_guests: formData.max_guests !== '' ? Number(formData.max_guests) : null,
+    amenities: formData.amenities
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+    images: [imageUrl],
+  }
+}
 
 function fmtDate(iso) {
   if (!iso) return ''
@@ -37,6 +80,10 @@ export default function AdminProperties() {
   const [properties, setProperties] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [editForm, setEditForm] = useState(emptyForm);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [restoring, setRestoring] = useState(null);
   const [message, setMessage] = useState('');
@@ -76,20 +123,7 @@ export default function AdminProperties() {
     e.preventDefault();
     if (!token) return;
 
-    const imageUrl = formData.image_url.trim() || DEFAULT_IMAGE;
-    const payload = {
-      title: formData.title,
-      property_type: formData.property_type,
-      emirate: formData.emirate,
-      area: formData.area,
-      price_daily: formData.price_daily ? Number(formData.price_daily) : null,
-      price_monthly: formData.price_monthly ? Number(formData.price_monthly) : null,
-      price_yearly: formData.price_yearly ? Number(formData.price_yearly) : null,
-      bedrooms: formData.bedrooms ? Number(formData.bedrooms) : null,
-      bathrooms: formData.bathrooms ? Number(formData.bathrooms) : null,
-      max_guests: formData.max_guests ? Number(formData.max_guests) : null,
-      images: [imageUrl],
-    };
+    const payload = formToPayload(formData);
 
     try {
       const res = await apiFetch('/api/properties/', {
@@ -165,6 +199,56 @@ export default function AdminProperties() {
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
+  const openDetails = (property) => {
+    setSelectedProperty(property);
+    setEditForm(propertyToForm(property));
+    setEditing(false);
+  };
+
+  const closeDetails = () => {
+    if (saving) return;
+    setSelectedProperty(null);
+    setEditing(false);
+  };
+
+  const handleEditChange = (e) => {
+    setEditForm({ ...editForm, [e.target.name]: e.target.value });
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (!token || !selectedProperty) return;
+
+    setSaving(true);
+    setMessage('');
+    try {
+      const res = await apiFetch(`/api/properties/${selectedProperty.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formToPayload(editForm)),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSelectedProperty(updated);
+        setEditForm(propertyToForm(updated));
+        setEditing(false);
+        setMessage(`"${updated.title}" updated successfully.`);
+        fetchProperties();
+      } else {
+        const error = await res.json();
+        setMessage('Update failed: ' + (error.detail || JSON.stringify(error)));
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage('Update failed. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -220,6 +304,13 @@ export default function AdminProperties() {
                   )}
                 </td>
                 <td style={{ padding: '16px', fontSize: '13px' }}>
+                  <button
+                    type="button"
+                    onClick={() => openDetails(p)}
+                    style={detailsBtnStyle}
+                  >
+                    View details
+                  </button>
                   {p.status === 'active' ? (
                     <button
                       type="button"
@@ -287,6 +378,19 @@ export default function AdminProperties() {
                 <input name="area" value={formData.area} onChange={handleChange} style={inputStyle} placeholder="e.g. Dubai Marina" />
               </div>
               <div>
+                <label style={labelStyle}>Address</label>
+                <input name="address" value={formData.address} onChange={handleChange} style={inputStyle} placeholder="Building, street, area" />
+              </div>
+              <div>
+                <label style={labelStyle}>Description</label>
+                <textarea name="description" value={formData.description} onChange={handleChange} style={{ ...inputStyle, minHeight: '90px', resize: 'vertical' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Amenities</label>
+                <input name="amenities" value={formData.amenities} onChange={handleChange} style={inputStyle} placeholder="Pool, Gym, Balcony" />
+                <p style={hintStyle}>Separate multiple amenities with commas.</p>
+              </div>
+              <div>
                 <label style={labelStyle}>Image URL</label>
                 <input
                   name="image_url"
@@ -334,8 +438,142 @@ export default function AdminProperties() {
           </div>
         </div>
       )}
+
+      {selectedProperty && (
+        <div
+          style={modalOverlayStyle}
+          onMouseDown={(e) => e.target === e.currentTarget && closeDetails()}
+        >
+          <div style={detailsModalStyle}>
+            <div style={modalHeaderStyle}>
+              <div>
+                <p style={{ ...hintStyle, margin: '0 0 4px' }}>PROPERTY DETAILS</p>
+                <h2 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>
+                  {editing ? 'Edit Property' : selectedProperty.title}
+                </h2>
+              </div>
+              <button type="button" onClick={closeDetails} style={closeBtnStyle}>×</button>
+            </div>
+
+            {editing ? (
+              <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <EditField label="Title *" name="title" required value={editForm.title} onChange={handleEditChange} />
+                <div style={formGridStyle}>
+                  <EditSelect label="Type" name="property_type" value={editForm.property_type} onChange={handleEditChange}
+                    options={['Apartment', 'Villa', 'Townhouse', 'Penthouse', 'Studio']} />
+                  <EditSelect label="Emirate *" name="emirate" required value={editForm.emirate} onChange={handleEditChange}
+                    options={['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman']} />
+                </div>
+                <div style={formGridStyle}>
+                  <EditField label="Area" name="area" value={editForm.area} onChange={handleEditChange} />
+                  <EditField label="Address" name="address" value={editForm.address} onChange={handleEditChange} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Description</label>
+                  <textarea name="description" value={editForm.description} onChange={handleEditChange}
+                    style={{ ...inputStyle, minHeight: 100, resize: 'vertical' }} />
+                </div>
+                <EditField label="Amenities" name="amenities" value={editForm.amenities}
+                  onChange={handleEditChange} hint="Separate amenities with commas." />
+                <div style={threeColumnGridStyle}>
+                  <EditField label="Bedrooms" name="bedrooms" type="number" min="0" value={editForm.bedrooms} onChange={handleEditChange} />
+                  <EditField label="Bathrooms" name="bathrooms" type="number" min="0" value={editForm.bathrooms} onChange={handleEditChange} />
+                  <EditField label="Max guests" name="max_guests" type="number" min="1" value={editForm.max_guests} onChange={handleEditChange} />
+                </div>
+                <div style={threeColumnGridStyle}>
+                  <EditField label="Daily AED" name="price_daily" type="number" min="0" value={editForm.price_daily} onChange={handleEditChange} />
+                  <EditField label="Monthly AED" name="price_monthly" type="number" min="0" value={editForm.price_monthly} onChange={handleEditChange} />
+                  <EditField label="Yearly AED" name="price_yearly" type="number" min="0" value={editForm.price_yearly} onChange={handleEditChange} />
+                </div>
+                <EditField label="Image URL" name="image_url" type="url" value={editForm.image_url} onChange={handleEditChange} />
+                {editForm.image_url && <img src={editForm.image_url} alt="Preview" style={previewImageStyle} />}
+
+                <div style={modalActionsStyle}>
+                  <button type="button" style={secondaryBtnStyle} onClick={() => {
+                    setEditForm(propertyToForm(selectedProperty))
+                    setEditing(false)
+                  }}>Cancel</button>
+                  <button type="submit" disabled={saving} style={primaryBtnStyle}>
+                    {saving ? 'Saving…' : 'Save changes'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                {selectedProperty.images?.[0] && (
+                  <img src={selectedProperty.images[0]} alt={selectedProperty.title} style={heroImageStyle} />
+                )}
+                <div style={statusRowStyle}>
+                  {(() => {
+                    const badge = statusBadge(selectedProperty)
+                    return <span style={{ ...statusPillStyle, background: badge.bg, color: badge.color }}>{badge.label}</span>
+                  })()}
+                  {selectedProperty.block_start && selectedProperty.block_end && (
+                    <span style={{ fontSize: 13, color: '#666' }}>
+                      {fmtDate(selectedProperty.block_start)} – {fmtDate(selectedProperty.block_end)}
+                    </span>
+                  )}
+                </div>
+                <div style={detailsGridStyle}>
+                  <Detail label="Property type" value={selectedProperty.property_type} />
+                  <Detail label="Location" value={[selectedProperty.area, selectedProperty.emirate].filter(Boolean).join(', ')} />
+                  <Detail label="Address" value={selectedProperty.address} wide />
+                  <Detail label="Bedrooms" value={selectedProperty.bedrooms} />
+                  <Detail label="Bathrooms" value={selectedProperty.bathrooms} />
+                  <Detail label="Maximum guests" value={selectedProperty.max_guests} />
+                  <Detail label="Daily price" value={money(selectedProperty.price_daily)} />
+                  <Detail label="Monthly price" value={money(selectedProperty.price_monthly)} />
+                  <Detail label="Yearly price" value={money(selectedProperty.price_yearly)} />
+                  <Detail label="Description" value={selectedProperty.description} wide />
+                  <Detail label="Amenities" value={selectedProperty.amenities?.join(', ')} wide />
+                  <Detail label="Property ID" value={selectedProperty.id} wide />
+                  <Detail label="Created" value={selectedProperty.created_at ? new Date(selectedProperty.created_at).toLocaleString() : null} wide />
+                </div>
+                <div style={modalActionsStyle}>
+                  <button type="button" onClick={closeDetails} style={secondaryBtnStyle}>Close</button>
+                  <button type="button" onClick={() => setEditing(true)} style={primaryBtnStyle}>Edit property</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function money(value) {
+  return value === null || value === undefined ? null : `AED ${Number(value).toLocaleString()}`
+}
+
+function Detail({ label, value, wide = false }) {
+  return (
+    <div style={{ ...detailItemStyle, ...(wide ? { gridColumn: '1 / -1' } : {}) }}>
+      <div style={detailLabelStyle}>{label}</div>
+      <div style={detailValueStyle}>{value === null || value === undefined || value === '' ? '—' : value}</div>
+    </div>
+  )
+}
+
+function EditField({ label, hint, ...props }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      <input {...props} style={inputStyle} />
+      {hint && <p style={hintStyle}>{hint}</p>}
+    </div>
+  )
+}
+
+function EditSelect({ label, options, ...props }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      <select {...props} style={inputStyle}>
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </div>
+  )
 }
 
 const inputStyle = {
@@ -348,6 +586,18 @@ const labelStyle = {
 
 const hintStyle = {
   marginTop: '6px', fontSize: '12px', color: '#888', lineHeight: 1.4,
+};
+
+const detailsBtnStyle = {
+  background: '#fff',
+  color: '#0B1120',
+  border: '1px solid #ccd2da',
+  borderRadius: '4px',
+  padding: '6px 12px',
+  marginRight: '8px',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
 };
 
 const deleteBtnStyle = {
@@ -370,4 +620,94 @@ const restoreBtnStyle = {
   fontSize: '12px',
   fontWeight: 600,
   cursor: 'pointer',
+};
+
+const modalOverlayStyle = {
+  position: 'fixed', inset: 0, zIndex: 1100,
+  background: 'rgba(0,0,0,0.55)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  padding: 16,
+};
+
+const detailsModalStyle = {
+  background: '#fff',
+  width: 760,
+  maxWidth: '100%',
+  maxHeight: '92vh',
+  overflowY: 'auto',
+  borderRadius: 10,
+  padding: 28,
+  boxSizing: 'border-box',
+  boxShadow: '0 24px 70px rgba(0,0,0,0.24)',
+};
+
+const modalHeaderStyle = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+  gap: 20, marginBottom: 22,
+};
+
+const closeBtnStyle = {
+  background: 'transparent', border: 0, fontSize: 28, lineHeight: 1,
+  color: '#666', cursor: 'pointer', padding: 0,
+};
+
+const heroImageStyle = {
+  width: '100%', height: 280, objectFit: 'cover',
+  borderRadius: 8, marginBottom: 18, background: '#eee',
+};
+
+const previewImageStyle = {
+  width: '100%', height: 180, objectFit: 'cover',
+  borderRadius: 6, marginTop: 10, background: '#eee',
+};
+
+const statusRowStyle = {
+  display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+  marginBottom: 20,
+};
+
+const statusPillStyle = {
+  padding: '5px 10px', borderRadius: 4, fontSize: 12, fontWeight: 700,
+};
+
+const detailsGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+  gap: 12,
+};
+
+const detailItemStyle = {
+  background: '#f8f9fa', padding: 14, borderRadius: 6,
+  minWidth: 0,
+};
+
+const detailLabelStyle = {
+  fontSize: 11, color: '#777', textTransform: 'uppercase',
+  letterSpacing: '0.05em', marginBottom: 5, fontWeight: 700,
+};
+
+const detailValueStyle = {
+  fontSize: 14, color: '#1d2633', lineHeight: 1.5, overflowWrap: 'anywhere',
+};
+
+const formGridStyle = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16,
+};
+
+const threeColumnGridStyle = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16,
+};
+
+const modalActionsStyle = {
+  display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24,
+};
+
+const primaryBtnStyle = {
+  background: '#0B1120', color: '#fff', border: 0, borderRadius: 4,
+  padding: '10px 16px', fontWeight: 600, cursor: 'pointer',
+};
+
+const secondaryBtnStyle = {
+  background: '#eee', color: '#333', border: 0, borderRadius: 4,
+  padding: '10px 16px', fontWeight: 600, cursor: 'pointer',
 };

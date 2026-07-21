@@ -120,8 +120,6 @@ export default function AdminProperties() {
   const [blockForm, setBlockForm] = useState({ start_date: '', end_date: '' });
   const [blockMessage, setBlockMessage] = useState('');
   const [managing, setManaging] = useState(false);
-  const [deleting, setDeleting] = useState(null);
-  const [restoring, setRestoring] = useState(null);
   const [message, setMessage] = useState('');
 
   const token = localStorage.getItem('dar_admin_token');
@@ -180,56 +178,6 @@ export default function AdminProperties() {
       }
     } catch (err) {
       console.error(err);
-    }
-  };
-
-  const handleDelete = async (propertyId, title) => {
-    if (!token) return;
-    if (!window.confirm(`Remove "${title}" from public listings?\n\nExisting bookings are kept.`)) return;
-
-    setDeleting(propertyId);
-    setMessage('');
-    try {
-      const res = await apiFetch(`/api/properties/${propertyId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setMessage(`"${title}" removed from listings.`);
-        fetchProperties();
-      } else {
-        const error = await res.json();
-        setMessage('Delete failed: ' + (error.detail || JSON.stringify(error)));
-      }
-    } catch (err) {
-      console.error(err);
-      setMessage('Delete failed. Please try again.');
-    } finally {
-      setDeleting(null);
-    }
-  };
-
-  const handleRestore = async (propertyId, title) => {
-    if (!token) return;
-    setRestoring(propertyId);
-    setMessage('');
-    try {
-      const res = await apiFetch(`/api/properties/${propertyId}/restore`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setMessage(`"${title}" is live on the site again.`);
-        fetchProperties();
-      } else {
-        const error = await res.json();
-        setMessage('Restore failed: ' + (error.detail || JSON.stringify(error)));
-      }
-    } catch (err) {
-      console.error(err);
-      setMessage('Restore failed. Please try again.');
-    } finally {
-      setRestoring(null);
     }
   };
 
@@ -327,7 +275,7 @@ export default function AdminProperties() {
     setManaging(true);
     setBlockMessage('');
     try {
-      const res = await apiFetch(`/api/properties/${property.id}/block`, {
+      const res = await apiFetch(`/api/property-management/${property.id}/block`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -339,7 +287,7 @@ export default function AdminProperties() {
         const error = await res.json();
         if (res.status === 404) {
           throw new Error(
-            'The deployed backend does not include the date-block endpoint yet. Redeploy the backend service, then try again.'
+            'Property management API is not deployed yet. Redeploy the backend service, then try again.'
           );
         }
         throw new Error(error.detail || JSON.stringify(error));
@@ -367,7 +315,7 @@ export default function AdminProperties() {
     if (!selectedProperty || !window.confirm(`Clear all date blocks for "${selectedProperty.title}"?`)) return;
     setManaging(true);
     try {
-      const res = await apiFetch(`/api/properties/${selectedProperty.id}/block`, {
+      const res = await apiFetch(`/api/property-management/${selectedProperty.id}/block`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -386,8 +334,8 @@ export default function AdminProperties() {
     setManaging(true);
     try {
       const endpoint = goingOffline
-        ? `/api/properties/${selectedProperty.id}/offline`
-        : `/api/properties/${selectedProperty.id}/restore`;
+        ? `/api/property-management/${selectedProperty.id}/offline`
+        : `/api/property-management/${selectedProperty.id}/restore`;
       const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -410,7 +358,7 @@ export default function AdminProperties() {
     if (!window.confirm(`Remove "${selectedProperty.title}" from the website?\n\nExisting bookings are kept.`)) return;
     setManaging(true);
     try {
-      const res = await apiFetch(`/api/properties/${selectedProperty.id}`, {
+      const res = await apiFetch(`/api/property-management/${selectedProperty.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -486,38 +434,10 @@ export default function AdminProperties() {
                   <button
                     type="button"
                     onClick={() => openDetails(p)}
-                    style={detailsBtnStyle}
+                    style={manageBtnStyle}
                   >
-                    View details
+                    Manage property
                   </button>
-                  {p.status === 'active' && (
-                    <button
-                      type="button"
-                      onClick={() => openBlockModal(p)}
-                      style={blockActionBtnStyle}
-                    >
-                      Block dates
-                    </button>
-                  )}
-                  {p.status === 'active' ? (
-                    <button
-                      type="button"
-                      disabled={deleting === p.id}
-                      onClick={() => handleDelete(p.id, p.title)}
-                      style={deleteBtnStyle}
-                    >
-                      {deleting === p.id ? 'Removing…' : 'Remove from website'}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={restoring === p.id}
-                      onClick={() => handleRestore(p.id, p.title)}
-                      style={restoreBtnStyle}
-                    >
-                      {restoring === p.id ? 'Restoring…' : 'Restore'}
-                    </button>
-                  )}
                 </td>
               </tr>
             )})}
@@ -890,49 +810,18 @@ const hintStyle = {
   marginTop: '6px', fontSize: '12px', color: '#888', lineHeight: 1.4,
 };
 
-const detailsBtnStyle = {
-  background: '#fff',
-  color: '#0B1120',
-  border: '1px solid #ccd2da',
-  borderRadius: '4px',
-  padding: '6px 12px',
-  marginRight: '8px',
-  fontSize: '12px',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
-
-const blockActionBtnStyle = {
-  background: '#fff8e7',
-  color: '#9a5800',
-  border: '1px solid #e5bd75',
-  borderRadius: '4px',
-  padding: '6px 12px',
-  marginRight: '8px',
-  fontSize: '12px',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
-
-const deleteBtnStyle = {
-  background: '#fff',
-  color: '#c5221f',
-  border: '1px solid #f5c6c6',
-  borderRadius: '4px',
-  padding: '6px 12px',
-  fontSize: '12px',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
-
-const restoreBtnStyle = {
-  background: '#fff',
-  color: '#137333',
-  border: '1px solid #ceead6',
-  borderRadius: '4px',
-  padding: '6px 12px',
-  fontSize: '12px',
-  fontWeight: 600,
+const manageBtnStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: 128,
+  background: '#0B1120',
+  color: '#fff',
+  border: '1px solid #0B1120',
+  borderRadius: 6,
+  padding: '8px 14px',
+  fontSize: 12,
+  fontWeight: 700,
   cursor: 'pointer',
 };
 

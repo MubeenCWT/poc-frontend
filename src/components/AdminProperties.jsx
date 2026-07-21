@@ -84,6 +84,8 @@ export default function AdminProperties() {
   const [editForm, setEditForm] = useState(emptyForm);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [blockForm, setBlockForm] = useState({ start_date: '', end_date: '' });
+  const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [restoring, setRestoring] = useState(null);
   const [message, setMessage] = useState('');
@@ -202,6 +204,7 @@ export default function AdminProperties() {
   const openDetails = (property) => {
     setSelectedProperty(property);
     setEditForm(propertyToForm(property));
+    setBlockForm({ start_date: '', end_date: '' });
     setEditing(false);
   };
 
@@ -246,6 +249,107 @@ export default function AdminProperties() {
       setMessage('Update failed. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const applyPropertyResponse = async (res, successMessage) => {
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || JSON.stringify(error));
+    }
+    const updated = await res.json();
+    setSelectedProperty(updated);
+    setEditForm(propertyToForm(updated));
+    setMessage(successMessage);
+    fetchProperties();
+    return updated;
+  };
+
+  const handleBlock = async (e) => {
+    e.preventDefault();
+    if (!selectedProperty || !blockForm.start_date || !blockForm.end_date) return;
+    setManaging(true);
+    setMessage('');
+    try {
+      const res = await apiFetch(`/api/properties/${selectedProperty.id}/block`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(blockForm),
+      });
+      await applyPropertyResponse(res, `"${selectedProperty.title}" blocked for the selected dates.`);
+      setBlockForm({ start_date: '', end_date: '' });
+    } catch (err) {
+      setMessage(`Block failed: ${err.message}`);
+    } finally {
+      setManaging(false);
+    }
+  };
+
+  const handleClearBlock = async () => {
+    if (!selectedProperty || !window.confirm(`Clear all date blocks for "${selectedProperty.title}"?`)) return;
+    setManaging(true);
+    try {
+      const res = await apiFetch(`/api/properties/${selectedProperty.id}/block`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await applyPropertyResponse(res, `"${selectedProperty.title}" date blocks cleared.`);
+    } catch (err) {
+      setMessage(`Could not clear block: ${err.message}`);
+    } finally {
+      setManaging(false);
+    }
+  };
+
+  const handleListingStatus = async (action) => {
+    if (!selectedProperty) return;
+    const goingOffline = action === 'offline';
+    if (goingOffline && !window.confirm(`Take "${selectedProperty.title}" offline and hide it from the website?`)) return;
+    setManaging(true);
+    try {
+      const endpoint = goingOffline
+        ? `/api/properties/${selectedProperty.id}/offline`
+        : `/api/properties/${selectedProperty.id}/restore`;
+      const res = await apiFetch(endpoint, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await applyPropertyResponse(
+        res,
+        goingOffline
+          ? `"${selectedProperty.title}" is offline.`
+          : `"${selectedProperty.title}" is live again.`,
+      );
+    } catch (err) {
+      setMessage(`Status update failed: ${err.message}`);
+    } finally {
+      setManaging(false);
+    }
+  };
+
+  const handleRemoveFromDetails = async () => {
+    if (!selectedProperty) return;
+    if (!window.confirm(`Remove "${selectedProperty.title}" from the website?\n\nExisting bookings are kept.`)) return;
+    setManaging(true);
+    try {
+      const res = await apiFetch(`/api/properties/${selectedProperty.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || 'Remove failed');
+      }
+      setMessage(`"${selectedProperty.title}" removed from listings.`);
+      setSelectedProperty(null);
+      fetchProperties();
+    } catch (err) {
+      setMessage(`Remove failed: ${err.message}`);
+    } finally {
+      setManaging(false);
     }
   };
 
@@ -526,9 +630,82 @@ export default function AdminProperties() {
                   <Detail label="Yearly price" value={money(selectedProperty.price_yearly)} />
                   <Detail label="Description" value={selectedProperty.description} wide />
                   <Detail label="Amenities" value={selectedProperty.amenities?.join(', ')} wide />
+                  <Detail
+                    label="Availability"
+                    value={
+                      selectedProperty.availability_status === 'available'
+                        ? 'Available now'
+                        : selectedProperty.availability_status === 'booked'
+                          ? 'Currently booked'
+                          : selectedProperty.availability_status === 'blocked'
+                            ? 'Temporarily blocked'
+                            : 'Offline'
+                    }
+                  />
+                  <Detail
+                    label="Next available"
+                    value={selectedProperty.next_available_date ? fmtDate(selectedProperty.next_available_date) : 'Not listed'}
+                  />
                   <Detail label="Property ID" value={selectedProperty.id} wide />
                   <Detail label="Created" value={selectedProperty.created_at ? new Date(selectedProperty.created_at).toLocaleString() : null} wide />
                 </div>
+
+                <section style={managementPanelStyle}>
+                  <div>
+                    <h3 style={{ margin: '0 0 5px', fontSize: 17 }}>Manage availability</h3>
+                    <p style={{ ...hintStyle, marginTop: 0 }}>
+                      These are the same property actions available through admin WhatsApp.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleBlock} style={blockFormStyle}>
+                    <div>
+                      <label style={labelStyle}>Block from</label>
+                      <input
+                        required
+                        type="date"
+                        value={blockForm.start_date}
+                        onChange={(e) => setBlockForm({ ...blockForm, start_date: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Block until</label>
+                      <input
+                        required
+                        type="date"
+                        min={blockForm.start_date || undefined}
+                        value={blockForm.end_date}
+                        onChange={(e) => setBlockForm({ ...blockForm, end_date: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <button type="submit" disabled={managing} style={blockBtnStyle}>
+                      Block dates
+                    </button>
+                  </form>
+
+                  <div style={managementActionsStyle}>
+                    {(selectedProperty.block_start || selectedProperty.block_active) && (
+                      <button type="button" disabled={managing} onClick={handleClearBlock} style={clearBlockBtnStyle}>
+                        Clear block
+                      </button>
+                    )}
+                    {selectedProperty.status === 'active' ? (
+                      <button type="button" disabled={managing} onClick={() => handleListingStatus('offline')} style={offlineBtnStyle}>
+                        Take offline
+                      </button>
+                    ) : (
+                      <button type="button" disabled={managing} onClick={() => handleListingStatus('online')} style={onlineBtnStyle}>
+                        Bring online
+                      </button>
+                    )}
+                    <button type="button" disabled={managing} onClick={handleRemoveFromDetails} style={removeBtnStyle}>
+                      Remove listing
+                    </button>
+                  </div>
+                </section>
+
                 <div style={modalActionsStyle}>
                   <button type="button" onClick={closeDetails} style={secondaryBtnStyle}>Close</button>
                   <button type="button" onClick={() => setEditing(true)} style={primaryBtnStyle}>Edit property</button>
@@ -710,4 +887,55 @@ const primaryBtnStyle = {
 const secondaryBtnStyle = {
   background: '#eee', color: '#333', border: 0, borderRadius: 4,
   padding: '10px 16px', fontWeight: 600, cursor: 'pointer',
+};
+
+const managementPanelStyle = {
+  marginTop: 22,
+  padding: 18,
+  border: '1px solid #e2e5e9',
+  borderRadius: 8,
+  background: '#fbfcfd',
+};
+
+const blockFormStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gap: 12,
+  alignItems: 'end',
+  marginTop: 16,
+};
+
+const managementActionsStyle = {
+  display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14,
+};
+
+const managementBtnBase = {
+  borderRadius: 4, padding: '9px 13px', fontSize: 12,
+  fontWeight: 700, cursor: 'pointer',
+};
+
+const blockBtnStyle = {
+  ...managementBtnBase,
+  background: '#b06000', color: '#fff', border: '1px solid #b06000',
+  minHeight: 39,
+};
+
+const clearBlockBtnStyle = {
+  ...managementBtnBase,
+  background: '#fff', color: '#b06000', border: '1px solid #e6b566',
+};
+
+const offlineBtnStyle = {
+  ...managementBtnBase,
+  background: '#fff', color: '#555', border: '1px solid #bbb',
+};
+
+const onlineBtnStyle = {
+  ...managementBtnBase,
+  background: '#e6f4ea', color: '#137333', border: '1px solid #b7dfc1',
+};
+
+const removeBtnStyle = {
+  ...managementBtnBase,
+  background: '#fff', color: '#c5221f', border: '1px solid #f0b7b5',
 };

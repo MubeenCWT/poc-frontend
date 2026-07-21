@@ -337,6 +337,11 @@ export default function AdminProperties() {
       });
       if (!res.ok) {
         const error = await res.json();
+        if (res.status === 404) {
+          throw new Error(
+            'The deployed backend does not include the date-block endpoint yet. Redeploy the backend service, then try again.'
+          );
+        }
         throw new Error(error.detail || JSON.stringify(error));
       }
       const updated = await res.json();

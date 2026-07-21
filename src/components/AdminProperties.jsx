@@ -64,6 +64,9 @@ function fmtDate(iso) {
 }
 
 function statusBadge(p) {
+  if (p.status === 'offline' || p.listing_label === 'offline') {
+    return { label: 'Offline', bg: '#eceff3', color: '#475467' }
+  }
   if (p.status === 'inactive') {
     return { label: 'Removed', bg: '#fce8e6', color: '#c5221f' }
   }
@@ -202,6 +205,7 @@ export default function AdminProperties() {
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const openDetails = (property) => {
+    setMessage('');
     setSelectedProperty(property);
     setEditForm(propertyToForm(property));
     setBlockForm({ start_date: '', end_date: '' });
@@ -267,7 +271,11 @@ export default function AdminProperties() {
 
   const handleBlock = async (e) => {
     e.preventDefault();
-    if (!selectedProperty || !blockForm.start_date || !blockForm.end_date) return;
+    if (!selectedProperty) return;
+    if (!blockForm.start_date || !blockForm.end_date) {
+      setMessage('Select both the start date and end date, then click Apply date block.');
+      return;
+    }
     setManaging(true);
     setMessage('');
     try {
@@ -559,6 +567,10 @@ export default function AdminProperties() {
               <button type="button" onClick={closeDetails} style={closeBtnStyle}>×</button>
             </div>
 
+            {message && (
+              <div style={modalMessageStyle}>{message}</div>
+            )}
+
             {editing ? (
               <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <EditField label="Title *" name="title" required value={editForm.title} onChange={handleEditChange} />
@@ -654,7 +666,8 @@ export default function AdminProperties() {
                   <div>
                     <h3 style={{ margin: '0 0 5px', fontSize: 17 }}>Manage availability</h3>
                     <p style={{ ...hintStyle, marginTop: 0 }}>
-                      These are the same property actions available through admin WhatsApp.
+                      A date block keeps the card visible but prevents bookings for the selected dates.
+                      The website and dashboard will show its blocked status.
                     </p>
                   </div>
 
@@ -662,7 +675,6 @@ export default function AdminProperties() {
                     <div>
                       <label style={labelStyle}>Block from</label>
                       <input
-                        required
                         type="date"
                         value={blockForm.start_date}
                         onChange={(e) => setBlockForm({ ...blockForm, start_date: e.target.value })}
@@ -672,7 +684,6 @@ export default function AdminProperties() {
                     <div>
                       <label style={labelStyle}>Block until</label>
                       <input
-                        required
                         type="date"
                         min={blockForm.start_date || undefined}
                         value={blockForm.end_date}
@@ -681,7 +692,7 @@ export default function AdminProperties() {
                       />
                     </div>
                     <button type="submit" disabled={managing} style={blockBtnStyle}>
-                      Block dates
+                      {managing ? 'Applying…' : 'Apply date block'}
                     </button>
                   </form>
 
@@ -821,6 +832,17 @@ const detailsModalStyle = {
 const modalHeaderStyle = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
   gap: 20, marginBottom: 22,
+};
+
+const modalMessageStyle = {
+  background: '#f0f6ff',
+  color: '#24476b',
+  border: '1px solid #cadff5',
+  borderRadius: 6,
+  padding: '10px 12px',
+  marginBottom: 16,
+  fontSize: 13,
+  lineHeight: 1.5,
 };
 
 const closeBtnStyle = {

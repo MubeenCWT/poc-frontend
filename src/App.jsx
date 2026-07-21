@@ -41,9 +41,15 @@ function LandingPage() {
   const [query, setQuery] = useState('')
 
   useEffect(() => {
-    apiFetch('/api/properties/')
+    // Always refresh listing status so newly blocked/future-blocked properties
+    // are not hidden by a stale browser/CDN response.
+    apiFetch(`/api/properties/?_=${Date.now()}`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((data) => setProperties(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const listings = Array.isArray(data) ? data : []
+        // A future block remains public. Only offline/removed records are hidden.
+        setProperties(listings.filter((property) => property.status === 'active'))
+      })
       .catch(() => setProperties([]))
       .finally(() => setLoading(false))
   }, [])

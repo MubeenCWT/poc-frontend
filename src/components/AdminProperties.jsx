@@ -120,6 +120,8 @@ export default function AdminProperties() {
   const [blockForm, setBlockForm] = useState({ start_date: '', end_date: '' });
   const [blockMessage, setBlockMessage] = useState('');
   const [managing, setManaging] = useState(false);
+  const [actionMenuId, setActionMenuId] = useState(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState({ top: 0, right: 0 });
   const [message, setMessage] = useState('');
 
   const token = localStorage.getItem('dar_admin_token');
@@ -152,6 +154,12 @@ export default function AdminProperties() {
   useEffect(() => {
     fetchProperties();
   }, [token]);
+
+  useEffect(() => {
+    const closeMenu = () => setActionMenuId(null);
+    document.addEventListener('click', closeMenu);
+    return () => document.removeEventListener('click', closeMenu);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -376,6 +384,45 @@ export default function AdminProperties() {
     }
   };
 
+  const removePropertyFromTable = async (property) => {
+    setActionMenuId(null);
+    if (!window.confirm(`Remove "${property.title}" from the website?\n\nExisting bookings are kept.`)) return;
+    try {
+      const res = await apiFetch(`/api/property-management/${property.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || 'Remove failed');
+      }
+      setMessage(`"${property.title}" removed from the website.`);
+      fetchProperties();
+    } catch (err) {
+      setMessage(`Remove failed: ${err.message}`);
+    }
+  };
+
+  const restorePropertyFromTable = async (property) => {
+    setActionMenuId(null);
+    try {
+      const res = await apiFetch(`/api/property-management/${property.id}/restore`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || 'Restore failed');
+      }
+      setMessage(`"${property.title}" restored to the website.`);
+      fetchProperties();
+    } catch (err) {
+      setMessage(`Restore failed: ${err.message}`);
+    }
+  };
+
+  const menuProperty = properties.find((property) => property.id === actionMenuId);
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -430,14 +477,29 @@ export default function AdminProperties() {
                     </div>
                   )}
                 </td>
-                <td style={{ padding: '16px', fontSize: '13px' }}>
+                <td style={{ padding: '16px', fontSize: '13px', position: 'relative' }}>
                   <button
                     type="button"
-                    onClick={() => openDetails(p)}
-                    style={manageBtnStyle}
+                    aria-label={`Actions for ${p.title}`}
+                    aria-expanded={actionMenuId === p.id}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      if (actionMenuId === p.id) {
+                        setActionMenuId(null)
+                        return
+                      }
+                      const rect = event.currentTarget.getBoundingClientRect()
+                      setActionMenuPosition({
+                        top: Math.min(rect.bottom + 6, window.innerHeight - 170),
+                        right: Math.max(12, window.innerWidth - rect.right),
+                      })
+                      setActionMenuId(p.id)
+                    }}
+                    style={kebabBtnStyle}
                   >
-                    Manage property
+                    <span aria-hidden="true">•••</span>
                   </button>
+
                 </td>
               </tr>
             )})}
@@ -447,6 +509,37 @@ export default function AdminProperties() {
           </tbody>
         </table>
       </div>
+
+      {menuProperty && (
+        <div
+          style={{ ...actionMenuStyle, ...actionMenuPosition }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button type="button" style={menuItemStyle} onClick={() => {
+            setActionMenuId(null)
+            openDetails(menuProperty)
+          }}>
+            View and edit details
+          </button>
+          {menuProperty.status === 'active' && (
+            <button type="button" style={menuItemStyle} onClick={() => {
+              setActionMenuId(null)
+              openBlockModal(menuProperty)
+            }}>
+              Block specific dates
+            </button>
+          )}
+          {menuProperty.status === 'active' ? (
+            <button type="button" style={dangerMenuItemStyle} onClick={() => removePropertyFromTable(menuProperty)}>
+              Remove from website
+            </button>
+          ) : (
+            <button type="button" style={successMenuItemStyle} onClick={() => restorePropertyFromTable(menuProperty)}>
+              Restore to website
+            </button>
+          )}
+        </div>
+      )}
 
       {showModal && (
         <div style={{
@@ -810,19 +903,59 @@ const hintStyle = {
   marginTop: '6px', fontSize: '12px', color: '#888', lineHeight: 1.4,
 };
 
-const manageBtnStyle = {
+const kebabBtnStyle = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minWidth: 128,
-  background: '#0B1120',
-  color: '#fff',
-  border: '1px solid #0B1120',
+  width: 36,
+  height: 34,
+  background: '#fff',
+  color: '#344054',
+  border: '1px solid #d0d5dd',
   borderRadius: 6,
-  padding: '8px 14px',
-  fontSize: 12,
-  fontWeight: 700,
+  padding: 0,
+  fontSize: 14,
+  letterSpacing: 2,
+  fontWeight: 800,
   cursor: 'pointer',
+};
+
+const actionMenuStyle = {
+  position: 'fixed',
+  zIndex: 1300,
+  width: 205,
+  padding: 6,
+  background: '#fff',
+  border: '1px solid #e4e7ec',
+  borderRadius: 8,
+  boxShadow: '0 12px 28px rgba(16,24,40,0.16)',
+};
+
+const menuItemStyle = {
+  display: 'block',
+  width: '100%',
+  border: 0,
+  background: 'transparent',
+  color: '#344054',
+  padding: '10px 11px',
+  borderRadius: 5,
+  textAlign: 'left',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const dangerMenuItemStyle = {
+  ...menuItemStyle,
+  color: '#b42318',
+  borderTop: '1px solid #f0f1f3',
+  borderRadius: 0,
+  marginTop: 3,
+};
+
+const successMenuItemStyle = {
+  ...menuItemStyle,
+  color: '#137333',
 };
 
 const modalOverlayStyle = {

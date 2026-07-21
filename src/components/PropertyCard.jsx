@@ -48,6 +48,11 @@ export default function PropertyCard({ property }) {
             Not bookable until {fmtBlockDate(block_end)}
           </p>
         )}
+        {blockedSoon && block_start && (
+          <p style={styles.blockSoonNote}>
+            Available now · blocked from {fmtBlockDate(block_start)}
+          </p>
+        )}
         <div style={styles.priceRow}>
           <span style={styles.price}>AED {price_daily?.toLocaleString()}</span>
           <span style={styles.priceUnit}>/ day</span>
@@ -112,6 +117,7 @@ const styles = {
   title: { fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, marginBottom: 6, lineHeight: 1.2 },
   meta: { fontSize: 13, color: '#2D3B4E', opacity: 0.75, marginBottom: 8 },
   blockNote: { fontSize: 12, color: '#c5221f', marginBottom: 10, fontWeight: 500 },
+  blockSoonNote: { fontSize: 12, color: '#9a5800', marginBottom: 10, fontWeight: 600 },
   priceRow: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap', marginBottom: 16 },
   price: { fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 500 },
   priceUnit: { fontSize: 12, opacity: 0.6 },
